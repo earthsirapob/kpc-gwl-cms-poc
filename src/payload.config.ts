@@ -3,16 +3,37 @@ import path from 'path'
 import { payloadCloud } from '@payloadcms/plugin-cloud'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { webpackBundler } from '@payloadcms/bundler-webpack'
+import { s3Adapter } from '@payloadcms/plugin-cloud-storage/s3'
+
 import { slateEditor } from '@payloadcms/richtext-slate'
 import { buildConfig } from 'payload/config'
 
-import Users from './collections/Users'
-import Pages from './collections/Pages'
-import MyDashboardView from './components/MyDashboardView'
-import Account from './components/Account'
+// import MyDashboardView from './components/MyDashboardView'
+// import Account from './components/Account'
 import Logo from './components/Logo'
 import Icon from './components/Icon'
+import { Users, Pages, Medias } from './collections'
+import { cloudStorage } from '@payloadcms/plugin-cloud-storage'
+import seo from '@payloadcms/plugin-seo'
+import { GenerateTitle } from '@payloadcms/plugin-seo/dist/types'
+// import { lexicalEditor } from '@payloadcms/richtext-lexical'
 // import { ChevronRightLinealIcon } from './assets/icons'
+
+const generateTitle: GenerateTitle = () => {
+  return 'My Store'
+}
+
+const storageAdapter = s3Adapter({
+  config: {
+    endpoint: process.env.S3_ENDPOINT,
+    region: process.env.S3_REGION,
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY,
+      secretAccessKey: process.env.S3_SECRET_KEY,
+    },
+  },
+  bucket: process.env.S3_BUCKET_NAME,
+})
 
 export default buildConfig({
   serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL,
@@ -24,14 +45,15 @@ export default buildConfig({
         Icon,
         Logo,
       },
-      views: {
-        // Account,
-        // Dashboard: MyDashboardView,
-      },
+      // views: {
+      // Account,
+      // Dashboard: MyDashboardView,
+      // },
     },
   },
+  // editor: lexicalEditor({}),
   editor: slateEditor({}),
-  collections: [Users, Pages],
+  collections: [Users, Pages, Medias],
   typescript: {
     outputFile: path.resolve(__dirname, 'payload-types.ts'),
   },
@@ -40,20 +62,28 @@ export default buildConfig({
   },
   localization: {
     locales: ['en', 'th'],
-    // locales: [
-    //   {
-    //     label: 'English',
-    //     code: 'en',
-    //   },
-    //   {
-    //     label: 'Thai',
-    //     code: 'th',
-    //   },
-    // ],
     defaultLocale: 'en',
-    // fallback: true,
+    fallback: true,
   },
-  plugins: [payloadCloud()],
+  cors: '*',
+  rateLimit: {
+    trustProxy: true,
+  },
+  plugins: [
+    payloadCloud(),
+    seo({
+      collections: ['pages', 'products'],
+      generateTitle,
+      uploadsCollection: 'media',
+    }),
+    cloudStorage({
+      collections: {
+        media: {
+          adapter: storageAdapter,
+        },
+      },
+    }),
+  ],
   db: postgresAdapter({
     pool: {
       host: 'localhost',
